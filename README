@@ -1,2 +1,4 @@
-compile command:
+compile command for example:
 gcc -c simple.c -o simple -L/usr/local/pgsql/lib -I/usr/local/pgsql/include -lpq
+
+
