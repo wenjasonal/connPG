@@ -1,0 +1,39 @@
+#include <stdlib.h>
+
+int main()
+{
+    EXEC SQL BEGIN DECLARE SECTION;
+         int caID;
+         varchar caName[20];
+    EXEC SQL END DECLARE SECTION; 
+
+    EXEC SQL CONNECT TO test@10.136.1.143:5432 USER lww/lww;
+    if(sqlca.sqlcode)
+    {
+       printf("CONNECT DATABASE error! sqlcode=%s\n", sqlca.sqlcode);
+    }
+    else 
+       printf("CONNECT DATABASE OK!\n");
+ 
+    EXEC SQL BEGIN TRANSACTION;
+    
+    //EXEC SQL CREATE TABLE test_transaction(id int not null, name varchar(20)); //first time
+    
+    EXEC SQL DELETE FROM test_transaction;  //repeat test
+    
+    EXEC SQL INSERT INTO test_transaction values(1, '易联达');
+    
+    EXEC SQL SELECT id, name INTO :caID, :caName FROM test_transaction;
+    printf("insert one result: id=%d, name=%*s\n", caID, caName.len, caName.arr);
+    
+    EXEC SQL UPDATE test_transaction SET name='北京易联达';
+    
+    EXEC SQL SELECT id, name INTO :caID, :caName FROM test_transaction;
+    printf("update the result: id=%d, name=%*s\n", caID, caName.len, caName.arr);
+    
+    //EXEC SQL ROLLBACK;
+    EXEC SQL COMMIT;
+
+    EXEC SQL DISCONNECT ALL;
+    return 0;
+}

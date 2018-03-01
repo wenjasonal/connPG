@@ -1,0 +1,82 @@
+#include <stdlib.h>
+
+int main()
+{
+  EXEC SQL CONNECT TO test@10.136.1.143 USER lww/lww;
+  if(sqlca.sqlcode)
+  {
+     printf("CONNECT TO DATABASE ERROR! sqlca.sqlcode=%d\n", sqlca.sqlcode);
+   }
+  else 
+     printf("CONNECT TO DATABASE OK!\n");
+
+  EXEC SQL BEGIN DECLARE SECTION;
+    int cacid[10];
+    varchar cacname[10][30];
+    int i, cnt;
+  EXEC SQL END DECLARE SECTION;
+
+  EXEC SQL BEGIN TRANSACTION;
+  EXEC SQL DROP TABLE test_copy;
+  EXEC SQL CREATE TABLE test_copy(cid int not null, cname varchar(30));
+  EXEC SQL INSERT INTO test_copy values(1, 'COPY值1');
+  EXEC SQL INSERT INTO test_copy values(2, 'COPY值2');
+  EXEC SQL INSERT INTO test_copy values(3, 'COPY值3');
+  EXEC SQL INSERT INTO test_copy values(4, '中文导出到文件');
+  
+  printf("\n==========copy table's data to csv file==========\n");
+  EXEC SQL DECLARE mycursor CURSOR WITH HOLD FOR select cid, cname from test_copy order by cid;
+  EXEC SQL OPEN mycursor;
+  while(1)
+  {
+    memset(cacname, 0x00, sizeof(cacname));
+ 
+    EXEC SQL FETCH FROM mycursor INTO :cacid, :cacname;
+    //printf("%d\n", sqlca.sqlerrd[2]);
+    if(sqlca.sqlcode == 100)
+    { 
+       break;
+     }
+    for(i=0; i<sqlca.sqlerrd[2]; i++)
+    {
+     printf("cid = %d, cname = %*s\n", cacid[i], cacname[i].len, cacname[i].arr);
+    }
+  }
+  EXEC SQL CLOSE mycursor;
+  
+  //copy data to file -- copy表数据到文件
+  EXEC SQL COPY (select cid, cname from test_copy) TO '/tmp/mycopy.csv' WITH (FORMAT CSV, HEADER, DELIMITER ',', ENCODING 'UTF8');
+  
+  printf("\n==========delete table all data==========\n");
+  EXEC SQL DELETE FROM test_copy;
+  EXEC SQL select count(1) INTO :cnt from test_copy;
+  printf("table count(*) = %d\n");
+ 
+  printf("\n======copy from csv file into table======\n");
+  //copy file to table -- copy文件数据到表
+  EXEC SQL COPY test_copy FROM '/tmp/mycopy.csv' WITH (FORMAT CSV, HEADER, DELIMITER ',', ENCODING 'UTF8');
+
+  EXEC SQL OPEN mycursor;
+  while(1)
+  {
+    memset(cacname, 0x00, sizeof(cacname));
+
+    EXEC SQL FETCH FROM mycursor INTO :cacid, :cacname;
+    //printf("%d\n", sqlca.sqlerrd[2]);
+    if(sqlca.sqlcode == 100)
+    {
+       break;
+     }
+    for(i=0; i<sqlca.sqlerrd[2]; i++)
+    {
+     printf("cid = %d, cname = %*s\n", cacid[i], cacname[i].len, cacname[i].arr);
+    }
+  }
+  EXEC SQL CLOSE mycursor;
+
+  EXEC SQL COMMIT;
+ 
+  EXEC SQL DISCONNECT ALL;
+  return 0;
+}
+

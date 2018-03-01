@@ -1,0 +1,3 @@
+compile command:
+#gcc -c simple.c -o simple -L/usr/local/pgsql/lib -I/usr/local/pgsql/include -lpqi
+gcc simpConn.c -o simpConn -L/usr/local/pgsql/lib -lpq

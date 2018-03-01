@@ -1,0 +1,5 @@
+--libpqc--
+gcc -o test test.c -L/usr/local/pgsql/lib -lpq
+--ecpg--
+ecpg test.pgc
+gcc -o test test.c -L/usr/local/pgsql/lib -lecpg

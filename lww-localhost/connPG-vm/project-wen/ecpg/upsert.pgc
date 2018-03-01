@@ -1,0 +1,80 @@
+#include <stdlib.h>
+
+int main()
+{
+  void print_sqlca();
+  EXEC SQL WHENEVER sqlerror CALL print_sqlca();
+
+  EXEC SQL BEGIN DECLARE SECTION;
+    int caID;
+    varchar caName[5][20];
+    varchar caExplain[5][30];
+    int i;
+  EXEC SQL END DECLARE SECTION;
+ 
+  EXEC SQL CONNECT TO test@10.136.1.143:5432 USER lww/lww;
+  if(sqlca.sqlcode) 
+    printf("Connect database error! sqlcode=%s\n", sqlca.sqlcode);
+  
+  EXEC SQL DROP table test_upsert; //multi-test
+  EXEC SQL CREATE table test_upsert(id int primary key, name varchar(20) not null, explain varchar(30));
+  EXEC SQL insert into test_upsert values(1, 'PSBC', 'insert1');
+  EXEC SQL insert into test_upsert values(2, 'CBANK', 'insert2');
+  EXEC SQL COMMIT;
+
+  EXEC SQL DECLARE upsert_cursor CURSOR WITH HOLD FOR 
+           SELECT id, name, explain FROM test_upsert
+           ORDER BY id;
+  EXEC SQL OPEN upsert_cursor;
+  while(1)
+  { 
+    EXEC SQL FETCH upsert_cursor INTO :caID, :caName, :caExplain;
+    if(sqlca.sqlcode == 100) break;
+    for(i=0;i<sqlca.sqlerrd[2];i++)
+      printf("id = %d, name = %*s, explain = %*s \n", caID, caName[i].len, caName[i].arr, caExplain[i].len, caExplain[i].arr);
+  }
+  EXEC SQL CLOSE upsert_cursor;
+  EXEC SQL COMMIT;
+
+  printf("==========insert on conflict do update==========\n");
+  
+  //更新某一字段的值！
+  //EXEC SQL insert into test_upsert(id, name, explain) values(2, 'replaceCBANK', 'replaceinsert2') ON CONFLICT(id) DO UPDATE set name=EXCLUDED.name;
+  //EXEC SQL insert into test_upsert(id, name, explain) values(2,'replaceCBANK', 'replaceinsert2') ON CONFLICT(id) DO UPDATE set explain=EXCLUDED.explain;
+
+  //更新多个字段的值！update many column one time!--存在则更新，不存在则插入！
+  //EXEC SQL insert into test_upsert(id, name, explain) values(2,'replaceCBANK', 'replaceinsert2') ON CONFLICT(id) DO UPDATE set (name, explain)=(EXCLUDED.name, EXCLUDED.explain);
+  EXEC SQL insert into test_upsert(id, name, explain) values(2,'replaceCBANK', 'replaceinsert2') ON CONFLICT(id) DO UPDATE set name=EXCLUDED.name, explain=EXCLUDED.explain;
+
+  //不存在则插入，存在则直接返回（不做任何处理）
+  //EXEC SQL insert into test_upsert values(3, 'newBANK', 'newInsert') ON CONFLICT(id) DO NOTHING;
+
+  EXEC SQL COMMIT;
+  EXEC SQL OPEN upsert_cursor;
+  while(1)
+  {
+    EXEC SQL FETCH upsert_cursor INTO :caID, :caName, :caExplain;
+    if(sqlca.sqlcode == 100) break;
+    for(i=0;i<sqlca.sqlerrd[2];i++)
+      printf("id = %d, name = %*s, explain = %*s \n", caID, caName[i].len, caName[i].arr, caExplain[i].len, caExplain[i].arr);
+  }
+  EXEC SQL CLOSE upsert_cursor;
+  EXEC SQL COMMIT;
+  
+  EXEC SQL DISCONNECT ALL;
+  return 0; 
+}
+void print_sqlca()
+{
+  fprintf(stderr, "==== sqlca ====\n");
+  fprintf(stderr, "sqlcode: %ld\n", sqlca.sqlcode);
+  fprintf(stderr, "sqlerrm.sqlerrml: %d\n", sqlca.sqlerrm.sqlerrml);
+  fprintf(stderr, "sqlerrm.sqlerrmc: %s\n", sqlca.sqlerrm.sqlerrmc);
+  fprintf(stderr, "sqlerrd: %ld %ld %ld %ld %ld %ld\n", sqlca.sqlerrd[0],sqlca.sqlerrd[1],sqlca.sqlerrd[2],
+  sqlca.sqlerrd[3],sqlca.sqlerrd[4],sqlca.sqlerrd[5]);
+  fprintf(stderr, "sqlwarn: %d %d %d %d %d %d %d %d\n", sqlca.sqlwarn[0], sqlca.sqlwarn[1], sqlca.sqlwarn[2],
+  sqlca.sqlwarn[3], sqlca.sqlwarn[4], sqlca.sqlwarn[5],
+  sqlca.sqlwarn[6], sqlca.sqlwarn[7]);
+  fprintf(stderr, "sqlstate: %5s\n", sqlca.sqlstate);
+  fprintf(stderr, "===============\n");
+}

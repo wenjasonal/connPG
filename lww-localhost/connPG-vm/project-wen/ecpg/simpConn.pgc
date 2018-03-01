@@ -1,0 +1,72 @@
+#include <stdlib.h>
+//#include <sqlca.h>
+//EXEC SQL INCLUDE sqlca;
+
+int main(){
+//*****************************建立数据库连接***********************************************//
+    //不同连接文本方法：
+    //EXEC SQL CONNECT TO test@10.136.1.143:5432 USER lww/lww;
+    //EXEC SQL CONNECT TO test@10.136.1.143:5432 AS myconnection USER lww/lww; //define a connection name
+    EXEC SQL CONNECT TO tcp:postgresql://10.136.1.143:5432/test USER lww/lww;
+    
+    //*EXEC SQL CONNECT TO unix:postgresql://10.136.1.143:5432/test USER lww; /* ERROR: Unix-domain sockets only work   */
+                                                                            /* on "localhost" but not on "10.136.1.143" */
+    //EXEC SQL CONNECT TO unix:postgresql://localhost:5432/test USER lww;   
+
+ 
+    //不同声明用户名方法：
+    //EXEC SQL CONNECT TO test@10.136.1.143:5432 USER lww/lww;
+    //EXEC SQL CONNECT TO test@10.136.1.143:5432 USER lww IDENTIFIED BY lww;
+    //EXEC SQL CONNECT TO test@10.136.1.143:5432 USER lww USING lww;
+  
+    //变量声明方式连接： 
+/*
+    EXEC SQL BEGIN DECLARE SECTION;
+    const char *target="test@10.136.1.143:5432";
+    const char *user="lww";
+    const char *password="lww";
+    EXEC SQL END DECLARE SECTION;
+    
+    EXEC SQL CONNECT TO :target USER :user USING :password; //OR EXEC SQL CONNECT TO :target USER :user/:password
+*/
+
+//**************************管理多个连接******************************************************//
+/*
+    EXEC SQL BEGIN DECLARE SECTION;
+         char dbname[1024];
+    EXEC SQL END DECLARE SECTION;
+    
+    EXEC SQL CONNECT TO test@10.136.1.143:5432 AS myconn USER lww/lww; //define a connection name
+    
+    //EXEC SQL AT myconn SELECT current_database() INTO :dbname; //为SQL语句指定连接（多个连接时）    
+    EXEC SQL SET CONNECTION myconn;//设置当前连接（多个连接切换）
+    EXEC SQL SELECT current_database() INTO :dbname;
+    
+    printf("current database=%s \n", dbname);
+*/
+//*************************************************************************************************
+
+    if(sqlca.sqlcode)
+    {
+       printf("Connect database ERROR! sqlcode=%d!\n", sqlca.sqlcode);
+    }
+    else
+       printf("Connect database OK!\n");
+
+    EXEC SQL set client_encoding to 'GB18030'; //设置当前连接的客户端编码
+    /*验证当前连接客户端编码*/
+    EXEC SQL BEGIN DECLARE SECTION;
+    char encoding[10];
+    EXEC SQL END DECLARE SECTION;
+    EXEC SQL SHOW client_encoding into :encoding;
+    printf("current client_encoding is \"%s\"\n", encoding);
+
+
+//关闭一个连接
+    EXEC SQL DISCONNECT all;
+    //EXEC SQL DISCONNECT myconn;
+    return 0;
+    
+}
+
+

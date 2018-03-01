@@ -1,0 +1,39 @@
+#include <stdlib.h>
+
+//EXEC SQL INCLUDE sqlca;
+
+EXEC SQL WHENEVER SQLERROR do sql_error();
+
+void sql_error()
+{
+    printf( "错误原因为:%.*s\n",sqlca.sqlerrm.sqlerrml,sqlca.sqlerrm.sqlerrmc);
+}
+
+int main( int argc, char **argv )
+{
+    EXEC SQL BEGIN DECLARE SECTION ;
+        int count = 0;
+    EXEC SQL END DECLARE SECTION ;
+
+    EXEC SQL CONNECT TO "lwwtest@10.136.1.61:5432" USER "lww" IDENTIFIED BY "lww";
+
+    int i;
+    while(1) {
+        EXEC SQL begin;
+        count++;
+        EXEC SQL insert into test_ecpg values( :count);
+        if(sqlca.sqlcode) {
+            printf("insert error\n");
+            break;
+        }
+        EXEC SQL COMMIT;
+        if(sqlca.sqlcode) {
+            printf("commit error\n");
+            break;
+        }
+    }
+    printf("count=%d\n", count);
+    return 0;
+}
+
+

@@ -1,0 +1,100 @@
+#include <stdlib.h>
+#include <string.h>
+ 
+int main(){
+  void print_sqlca();
+
+  EXEC SQL BEGIN DECLARE SECTION; 
+     char caCode[10];
+     char caName[10][30];
+  EXEC SQL END DECLARE SECTION;
+
+  EXEC SQL CONNECT TO test@10.136.1.143:5432 USER lww/lww;
+
+  if(sqlca.sqlcode) 
+  {
+    printf("Connect database ERROR! sqlcode=%s\n", sqlca.sqlcode);
+  }
+  else
+    printf("Connect database OK!\n");
+
+  //删除表内记录
+  EXEC SQL DELETE FROM organ;
+  //插入多条记录
+  EXEC SQL INSERT INTO organ values (1, '机构1'); 
+  EXEC SQL INSERT INTO organ values (2, '机构2'); 
+  EXEC SQL INSERT INTO organ values (3, '机构3'); 
+  EXEC SQL INSERT INTO organ values (4, '机构4'); 
+  EXEC SQL INSERT INTO organ values (5, '机构5'); 
+  
+  if(sqlca.sqlcode)
+  {
+    print_sqlca();
+  }
+
+  EXEC SQL COMMIT; //ecpg编译时不加-t参数，此处需要显示提交,否则数据库内数据未更新！
+  
+
+  EXEC SQL BEGIN TRANSACTION; //先begin transaction后declare cursor！
+  //预备语句定义游标--注意最后释放
+  EXEC SQL PREPARE myselect FROM "select organcode, organname from organ order by organcode";
+  EXEC SQL DECLARE organ_cursor CURSOR WITH HOLD FOR myselect;
+
+  //EXEC SQL BEGIN TRANSACTION; //先declare cursor 后begin transaction！
+  EXEC SQL OPEN organ_cursor;
+
+  memset(caCode, 0x00, sizeof(caCode));
+  memset(caName, 0x00, sizeof(caName));
+
+  EXEC SQL WHENEVER NOT FOUND DO BREAK; //while里还有for循环？--报错break语句未在loop或while内？
+  EXEC SQL WHENEVER SQLERROR STOP;
+   while(1)
+   {
+     EXEC SQL FETCH FROM organ_cursor INTO :caCode, :caName;
+       printf("organcode = %s, organname = %s\n", caCode, caName); 
+   }
+  
+  EXEC SQL WHENEVER NOT FOUND CONTINUE; //出循环后必须复位break设置，否则添加后续操作时break报错（within out loop...）
+  EXEC SQL UPDATE organ SET organname='易联达' WHERE organcode=3;
+  EXEC SQL CLOSE organ_cursor;
+  //EXEC SQL ROLLBACK;
+  EXEC SQL COMMIT;
+  
+  printf("==========================================\n");
+
+  //EXEC SQL DEALLOCATE PREPARE myselect; //释放预备语句
+  
+  EXEC SQL INSERT INTO organ values ('88', '游标取后新插入值');
+  EXEC SQL COMMIT;
+
+  EXEC SQL BEGIN TRANSACTION;
+  EXEC SQL OPEN organ_cursor;
+  EXEC SQL WHENEVER NOT FOUND DO BREAK;
+  while(1)
+  {
+    EXEC SQL FETCH FROM organ_cursor INTO :caCode, :caName;
+    printf("organcode = %s, organname = %s\n", caCode, caName);
+  }
+
+  EXEC SQL CLOSE organ_cursor;
+  EXEC SQL COMMIT;
+
+  EXEC SQL DEALLOCATE PREPARE myselect; //释放预备语句--最后断开连接之前
+  EXEC SQL DISCONNECT all;
+  return 0;
+}
+
+void print_sqlca()
+{
+  fprintf(stderr, "==== sqlca ====\n");
+  fprintf(stderr, "sqlcode: %ld\n", sqlca.sqlcode);
+  fprintf(stderr, "sqlerrm.sqlerrml: %d\n", sqlca.sqlerrm.sqlerrml);
+  fprintf(stderr, "sqlerrm.sqlerrmc: %s\n", sqlca.sqlerrm.sqlerrmc);
+  fprintf(stderr, "sqlerrd: %ld %ld %ld %ld %ld %ld\n", sqlca.sqlerrd[0],sqlca.sqlerrd[1],sqlca.sqlerrd[2],
+  sqlca.sqlerrd[3],sqlca.sqlerrd[4],sqlca.sqlerrd[5]);
+  fprintf(stderr, "sqlwarn: %d %d %d %d %d %d %d %d\n", sqlca.sqlwarn[0], sqlca.sqlwarn[1], sqlca.sqlwarn[2],
+  sqlca.sqlwarn[3], sqlca.sqlwarn[4], sqlca.sqlwarn[5],
+  sqlca.sqlwarn[6], sqlca.sqlwarn[7]);
+  fprintf(stderr, "sqlstate: %5s\n", sqlca.sqlstate);
+  fprintf(stderr, "===============\n");
+}

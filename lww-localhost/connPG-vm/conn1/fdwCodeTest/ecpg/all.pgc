@@ -1,0 +1,58 @@
+#include <stdlib.h>    
+//#include <sqlca.h>
+    
+//EXEC SQL INCLUDE sqlca;    
+    
+int main() {  
+    EXEC SQL BEGIN DECLARE SECTION;
+         int caID;
+         varchar caName[10];
+    EXEC SQL END DECLARE SECTION;
+	
+    EXEC SQL CONNECT TO "lwwtest@10.136.1.32:5432" USER "lww" IDENTIFIED BY "lww";
+    if(sqlca.sqlcode)
+    {
+      printf("Connect DB error! sqlcode=%d!\n", sqlca.sqlcode);
+    }
+	//EXEC SQL BEGIN TRANSACTION;
+        EXEC SQL drop table test_ecpg_tbl;//testing
+        //EXEC SQL COMMIT;
+	EXEC SQL create table test_ecpg_tbl(id int, name varchar(10));
+        //EXEC SQL COMMIT;
+        EXEC SQL create unique index idx1 on test_ecpg_tbl(id);
+       	//EXEC SQL COMMIT;
+	EXEC SQL INSERT INTO test_ecpg_tbl values(1, 'varchar123');
+        //EXEC SQL COMMIT;
+        EXEC SQL INSERT INTO test_ecpg_tbl values(2, '中文测试一二三四五六');
+	//EXEC SQL COMMIT;
+
+        EXEC SQL UPDATE test_ecpg_tbl SET id=100 WHERE id=1;
+        //EXEC SQL COMMIT;
+  //    EXEC SQL delete from test_ecpg_tbl where id=100;
+  //    EXEC SQL COMMIT;
+	
+        EXEC SQL BEGIN TRANSACTION;
+	EXEC SQL DECLARE tb_cur CURSOR FOR
+	     select id, name INTO :caID, :caName from test_ecpg_tbl;
+	//if(sqlca.sqlcode){}
+	EXEC SQL OPEN tb_cur;
+	//if(sqlca.sqlcode){}
+        EXEC SQL WHENEVER NOT FOUND DO BREAK;
+        while(1)
+        {
+          EXEC SQL FETCH tb_cur INTO :caID, :caName;
+          //printf("id=%d, name=%s\n", caID, caName); //char name
+          printf("id=%d, name=%*s\n", caID,caName.len, caName.arr);//varchar name
+          // if(sqlca.sqlcode) break;
+         }
+
+	EXEC SQL CLOSE tb_cur;
+	EXEC SQL COMMIT;
+
+  //    EXEC SQL delete from test_ecpg_tbl where id=100;
+  //    EXEC SQL COMMIT;
+	
+        EXEC SQL DISCONNECT all;
+    
+        return 0;    
+}

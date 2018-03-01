@@ -1,0 +1,3 @@
+2testlibpq-listen说明：
+运行./2testlibpq-listen程序后，在另外的窗口连接到库test中输入命令"notify tbl2"后程序返回结果
+

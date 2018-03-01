@@ -1,0 +1,90 @@
+#include <stdlib.h>    
+//#include <sqlca.h>
+    
+//EXEC SQL INCLUDE sqlca;    
+    
+int main() {  
+    void print_sqlca();
+
+    EXEC SQL BEGIN DECLARE SECTION;
+         int caID;
+         varchar caName[10];
+    EXEC SQL END DECLARE SECTION;
+	
+    EXEC SQL CONNECT TO "lwwtest@10.136.2.133:5432" USER "lww" IDENTIFIED BY "lww";
+    if(sqlca.sqlcode)
+    {
+      printf("Connect DB error! sqlcode=%d!\n", sqlca.sqlcode);
+    }
+	//EXEC SQL BEGIN TRANSACTION;
+        EXEC SQL drop table test_ecpg_tbl;//testing
+        EXEC SQL COMMIT;
+	EXEC SQL create table test_ecpg_tbl(id int, name varchar(10));
+        EXEC SQL COMMIT;
+        EXEC SQL create unique index idx1 on test_ecpg_tbl(id);
+       	EXEC SQL COMMIT;
+	EXEC SQL INSERT INTO test_ecpg_tbl values(1, 'varchar123');
+        if(sqlca.sqlcode)
+           {
+             print_sqlca();
+           }
+        EXEC SQL COMMIT;
+        EXEC SQL INSERT INTO test_ecpg_tbl values(2, '一二三四五六七八九十多');
+          if(sqlca.sqlcode)
+           {
+             print_sqlca();
+           }
+	EXEC SQL COMMIT;
+
+        EXEC SQL UPDATE test_ecpg_tbl SET id=100 WHERE id=1;
+        EXEC SQL COMMIT;
+//      EXEC SQL delete from test_ecpg_tbl where id=100;
+  //    EXEC SQL COMMIT;
+	
+     EXEC SQL BEGIN TRANSACTION; 
+	EXEC SQL DECLARE tb_cur CURSOR FOR
+	     select id, name INTO :caID, :caName from test_ecpg_tbl;
+	//if(sqlca.sqlcode){}
+	EXEC SQL OPEN tb_cur;
+	//if(sqlca.sqlcode){}
+        EXEC SQL WHENEVER NOT FOUND DO BREAK;
+        while(1)
+        {
+	 EXEC SQL FETCH tb_cur INTO :caID, :caName;
+         //printf("id=%d, name=%s\n", caID, caName); //char name
+         printf("id=%d, name=%*s\n", caID,caName.len, caName.arr);//varchar name
+         //if(sqlca.sqlcode==100) break;
+         if(sqlca.sqlcode)
+          {
+         //  print_sqlca();
+           break;
+          }
+        }
+
+	EXEC SQL CLOSE tb_cur;
+     EXEC SQL COMMIT;
+
+      //EXEC SQL delete from test_ecpg_tbl where id=100;
+      //EXEC SQL COMMIT;
+
+      //EXEC SQL WHENEVER SQLERROR CALL print_sqlca();
+	
+     EXEC SQL DISCONNECT all;
+    
+     return 0;
+}
+
+void print_sqlca()
+{
+fprintf(stderr, "==== sqlca ====\n");
+fprintf(stderr, "sqlcode: %ld\n", sqlca.sqlcode);
+fprintf(stderr, "sqlerrm.sqlerrml: %d\n", sqlca.sqlerrm.sqlerrml);
+fprintf(stderr, "sqlerrm.sqlerrmc: %s\n", sqlca.sqlerrm.sqlerrmc);
+fprintf(stderr, "sqlerrd: %ld %ld %ld %ld %ld %ld\n", sqlca.sqlerrd[0],sqlca.sqlerrd[1],sqlca.sqlerrd[2],
+sqlca.sqlerrd[3],sqlca.sqlerrd[4],sqlca.sqlerrd[5]);
+fprintf(stderr, "sqlwarn: %d %d %d %d %d %d %d %d\n", sqlca.sqlwarn[0], sqlca.sqlwarn[1], sqlca.sqlwarn[2],
+sqlca.sqlwarn[3], sqlca.sqlwarn[4], sqlca.sqlwarn[5],
+sqlca.sqlwarn[6], sqlca.sqlwarn[7]);
+fprintf(stderr, "sqlstate: %5s\n", sqlca.sqlstate);
+fprintf(stderr, "===============\n");
+}  

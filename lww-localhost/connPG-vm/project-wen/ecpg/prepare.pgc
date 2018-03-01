@@ -1,0 +1,134 @@
+#include<stdlib.h>
+
+int main()
+{
+  void print_sqlca();
+  EXEC SQL WHENEVER sqlerror CALL print_sqlca();
+
+  EXEC SQL CONNECT TO tcp:postgresql://10.136.1.143:5432/test USER lww/lww;
+
+  EXEC SQL DROP table test_pre2; //multi-test!
+  EXEC SQL DROP table test_pre1; //multi-test!
+  EXEC SQL CREATE table test_pre1(sid int primary key, sname varchar(20), addr varchar(40));
+  EXEC SQL CREATE table test_pre2(cid int primary key, cname varchar(20), csid int references test_pre1(sid));
+  EXEC SQL INSERT INTO test_pre1 values(1, 'Json', 'address1');
+  EXEC SQL INSERT INTO test_pre1 values(2, 'Wang', 'address2');
+  EXEC SQL INSERT INTO test_pre1 values(3, 'Gill', 'address3');
+  EXEC SQL INSERT INTO test_pre2 values(101, '语文', 1);
+  EXEC SQL INSERT INTO test_pre2 values(102, '数学', 2);
+  EXEC SQL INSERT INTO test_pre2 values(103, '英语', 3);
+  EXEC SQL COMMIT;
+  
+  EXEC SQL BEGIN DECLARE SECTION;
+    char *stmt = "select cid, cname, sid, sname, addr from test_pre1, test_pre2 where sid=csid";
+    char *stmt1 = "select cid, cname, sid, sname, addr from test_pre1, test_pre2 where sid=csid and sname=?";
+    char *cntstmt = "select count(1) from test_pre1, test_pre2 where sid=csid";
+    char *cntstmt1 = "select count(1) from test_pre1, test_pre2 where sid=csid and sname=?";
+    char *cntstmt2 = "select count(1) from test_pre1, test_pre2 where sid=csid and sid=?";
+    int caCID[5], caSID[5];
+    varchar caCname[5][20], caSname[5][20], caAddr[5][40];
+    char caCname1[5][20], caSname1[5][20], caAddr1[5][40];
+    int i;
+    int cnt;
+    int a;
+    char *b;
+    char *c;
+  EXEC SQL END DECLARE SECTION;
+
+  //init variable
+  memset(caCID, 0, sizeof(caCID));
+  memset(caSID, 0, sizeof(caSID));
+  memset(caCname, 0x00, sizeof(caCname));
+  memset(caCname1, 0x00, sizeof(caCname1));
+  memset(caSname, 0x00, sizeof(caSname));
+  memset(caSname1, 0x00, sizeof(caSname1));
+  memset(caAddr, 0x00, sizeof(caAddr));
+  memset(caAddr1, 0x00, sizeof(caAddr1));
+
+
+  //语句--prepare name from string(字串)；
+  //EXEC SQL ALLOCATE DESCRIPTOR outdesc;
+//EXEC SQL PREPARE myprep from :stmt;  //no-parameter
+  EXEC SQL PREPARE myprep1 from :stmt1; //with-parameter(带参)
+  //EXEC SQL PREPARE cntprep from :cntstmt;  //no-parameter
+  EXEC SQL PREPARE cntprep1 from :cntstmt1; //with-parameter(带字符型参数)
+  //EXEC SQL PREPARE cntprep2 from :cntstmt2; //with-parameter(带整型参数)
+
+/*
+  //语句--prepare name as statement(不带参数)；
+  //可执行(Correct)!--prepare .. as ...（不带参数）--ecpg将as后面语句直接处理为字符串，同prepare...from一样可用！
+  EXEC SQL prepare myprep as select cid, cname, sid, sname, addr from test_pre1, test_pre2 where sid=csid;
+  //EXEC SQL prepare myprep from "select cid, cname, sid, sname, addr from test_pre1, test_pre2 where sid=csid";
+  EXEC SQL PREPARE cntprep as select count(1) from test_pre1, test_pre2 where sid=csid;
+  //不可执行(error)!--prepare .. as ...（带参数）--不可用，ecpg将as后语句处理为string，因此无法识别$1为参数!
+  EXEC SQL prepare myins1 (int, char, char) as insert into test_pre1 values($1, $2, $3);
+  EXEC SQL EXECUTE myins1(8, 'WEN', 'address8');
+  EXEC SQL prepare myprep as select cid, cname, sid, sname, addr from test_pre1, test_pre2 where sid=csid;
+  EXEC SQL PREPARE cntprep as select count(1) from test_pre1, test_pre2 where sid=csid; 
+*/
+
+  //FOR-IN-EXECUTE取数据！--one way 
+  //EXEC SQL EXECUTE myprep1 USING SQL DESCRIPTOR indesc INTO SQL DESCRIPTOR outdesc;
+
+  //带参语句--smtm1--prepare...from...
+  b="Wang"; 
+  EXEC SQL EXECUTE myprep1 INTO :caCID, :caCname1, :caSID, :caSname1, :caAddr1 USING :b;//对应语句smtm1--带参
+  EXEC SQL EXECUTE cntprep1 INTO :cnt USING :b; //CORRECT!--USING后跟变量
+  //EXEC SQL EXECUTE cntprep1 INTO :cnt USING 'Wang'; //ERROR!--取不到cnt值--USING后字符常量
+  //EXEC SQL EXECUTE cntprep2 INTO :cnt USING 2; //CORRECT!--USING后整型常量
+  //printf("%d\n",cnt);
+
+/*
+  //不带参语句--smtm--prepare...from...
+  EXEC SQL EXECUTE myprep INTO :caCID, :caCname1, :caSID, :caSname1, :caAddr1;//fetch语句完成取出到宿主变量
+  EXEC SQL EXECUTE cntprep INTO :cnt;
+*/
+
+  printf("cid, cname, sid, sname, addr\n");
+  for(i=0;i<cnt;i++)
+  {
+     printf("%d, %s, %d, %s, %s\n", caCID[i], caCname1[i], caSID[i], caSname1[i], caAddr1[i]);
+  } 
+
+/*
+  //OPEN-FOR-EXECUTE(cursor)取数据！--another way
+  EXEC SQL DECLARE mycur CURSOR FOR myprep;
+  EXEC SQL OPEN mycur;
+  while(1)
+  {
+    EXEC SQL FETCH 2 mycur INTO :caCID, :caCname, :caSID, :caSname, :caAddr;
+    printf("fetch:%d\n", sqlca.sqlerrd[2]);
+    if(sqlca.sqlcode == 100)
+    {
+      break;
+     }
+    for(i=0; i<sqlca.sqlerrd[2]; i++)
+      printf("cid = %d, cname = %*s, sid = %d, sname = %*s, addr = %*s\n", caCID[i], caCname[i].len, caCname[i].arr, caSID[i], caSname[i].len, caSname[i].arr, caAddr[i].len, caAddr[i].arr);
+  }  
+  EXEC SQL CLOSE mycur;
+  EXEC SQL COMMIT;
+*/
+
+  //EXEC SQL DEALLOCATE PREPARE myprep;//释放资源
+  //EXEC SQL DEALLOCATE PREPARE cntprep;//释放资源
+  EXEC SQL DEALLOCATE PREPARE myprep1;//释放资源
+  EXEC SQL DEALLOCATE PREPARE cntprep1;//释放资源
+  //EXEC SQL DEALLOCATE PREPARE cntprep2;//释放资源
+
+  EXEC SQL DISCONNECT ALL;
+  return 0;
+}
+void print_sqlca()
+{
+  fprintf(stderr, "==== sqlca ====\n");
+  fprintf(stderr, "sqlcode: %ld\n", sqlca.sqlcode);
+  fprintf(stderr, "sqlerrm.sqlerrml: %d\n", sqlca.sqlerrm.sqlerrml);
+  fprintf(stderr, "sqlerrm.sqlerrmc: %s\n", sqlca.sqlerrm.sqlerrmc);
+  fprintf(stderr, "sqlerrd: %ld %ld %ld %ld %ld %ld\n", sqlca.sqlerrd[0],sqlca.sqlerrd[1],sqlca.sqlerrd[2],
+  sqlca.sqlerrd[3],sqlca.sqlerrd[4],sqlca.sqlerrd[5]);
+  fprintf(stderr, "sqlwarn: %d %d %d %d %d %d %d %d\n", sqlca.sqlwarn[0], sqlca.sqlwarn[1], sqlca.sqlwarn[2],
+  sqlca.sqlwarn[3], sqlca.sqlwarn[4], sqlca.sqlwarn[5],
+  sqlca.sqlwarn[6], sqlca.sqlwarn[7]);
+  fprintf(stderr, "sqlstate: %5s\n", sqlca.sqlstate);
+  fprintf(stderr, "===============\n");
+}

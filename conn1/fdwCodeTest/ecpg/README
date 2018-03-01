@@ -1,0 +1,3 @@
+ecpg -t testing.pgc
+gcc -o testing testing.c -I/usr/local/pgsql/include -L/usr/local/pgsql/lib -lecpg
+./testing

@@ -1,0 +1,101 @@
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+int main(){
+  void print_sqlca();
+
+  EXEC SQL BEGIN DECLARE SECTION; 
+     int caCode[10];
+     varchar caName[10][30];
+  EXEC SQL END DECLARE SECTION;
+
+  EXEC SQL CONNECT TO lwwtest@10.136.1.32:5432 USER lww/lww;
+
+  if(sqlca.sqlcode) 
+  {
+    printf("Connect database ERROR! sqlcode=%ld\n", sqlca.sqlcode);
+  }
+  else
+    printf("Connect database OK!\n");
+
+  //测试前--删除表内记录
+  EXEC SQL DELETE FROM organ_ecpg;
+  EXEC SQL COMMIT;
+  printf("Delete data OK!\n");
+
+  EXEC SQL BEGIN TRANSACTION;
+  //插入多条记录
+  EXEC SQL INSERT INTO organ_ecpg values (1, '机构1');
+    printf("11 Insert into organ_ecpg_1 data!\n");
+  EXEC SQL INSERT INTO organ_ecpg values (2, '机构2'); 
+    printf("01 Insert into organ_ecpg_0 data!\n");
+  EXEC SQL INSERT INTO organ_ecpg values (3, '机构3');
+    printf("12 Insert into organ_ecpg_1 data!\n");
+  EXEC SQL INSERT INTO organ_ecpg values (4, '机构4'); 
+    printf("02 Insert into organ_ecpg_0 data!\n");
+  EXEC SQL INSERT INTO organ_ecpg values (5, '机构5'); 
+    printf("13 Insert into organ_ecpg_1 data!\n");
+  EXEC SQL UPDATE organ_ecpg SET orgname='机构更名' where orgname='机构5';
+    printf("Update organ_ecpg_1 data!\n");
+    sleep (5); 
+  EXEC SQL UPDATE organ_ecpg SET orgname='机构更名' where orgname='机构2';
+    printf("Update organ_ecpg_0 data!\n");
+    sleep (5);
+
+  sleep (20);
+  EXEC SQL COMMIT;
+  //EXEC SQL ROLLBACK;
+
+  if(sqlca.sqlcode) 
+  {
+    printf("Some ERROR happened! sqlca.sqlcode=%ld\n", sqlca.sqlcode);
+    print_sqlca();
+   // EXEC SQL ROLLBACK;
+   // printf("Rollback sqlca.sqlcode=%ld\n", sqlca.sqlcode);
+    return -1;
+  }
+
+  //定义游标读取表内所有记录
+  EXEC SQL DECLARE organ_ecpg_cursor CURSOR FOR
+       SELECT orgcode, orgname FROM organ_ecpg
+       ORDER BY orgcode;
+  EXEC SQL OPEN organ_ecpg_cursor;
+ 
+  while(1)
+  {
+     memset(caName, 0x00, sizeof(caName));
+     EXEC SQL FETCH 2 organ_ecpg_cursor INTO :caCode, :caName;
+     printf("%ld\n", sqlca.sqlerrd[2]);
+     if(sqlca.sqlcode==100)
+          {
+           //print_sqlca();
+           break;
+          }
+     
+     int i=0;
+     for( i=0; i<sqlca.sqlerrd[2]; i++)
+           printf("orgcode = %d, orgname = %*s\n", caCode[i], caName[i].len, caName[i].arr); //NOTE: varchar type
+  }
+  
+  EXEC SQL CLOSE organ_ecpg_cursor;
+  EXEC SQL COMMIT;
+
+  EXEC SQL DISCONNECT all;
+  return 0;
+
+}
+void print_sqlca()
+{
+  fprintf(stderr, "==== sqlca ====\n");
+  fprintf(stderr, "sqlcode: %ld\n", sqlca.sqlcode);
+  fprintf(stderr, "sqlerrm.sqlerrml: %d\n", sqlca.sqlerrm.sqlerrml);
+  fprintf(stderr, "sqlerrm.sqlerrmc: %s\n", sqlca.sqlerrm.sqlerrmc);
+  fprintf(stderr, "sqlerrd: %ld %ld %ld %ld %ld %ld\n", sqlca.sqlerrd[0],sqlca.sqlerrd[1],sqlca.sqlerrd[2],
+  sqlca.sqlerrd[3],sqlca.sqlerrd[4],sqlca.sqlerrd[5]);
+  fprintf(stderr, "sqlwarn: %d %d %d %d %d %d %d %d\n", sqlca.sqlwarn[0], sqlca.sqlwarn[1], sqlca.sqlwarn[2],
+  sqlca.sqlwarn[3], sqlca.sqlwarn[4], sqlca.sqlwarn[5],
+  sqlca.sqlwarn[6], sqlca.sqlwarn[7]);
+  fprintf(stderr, "sqlstate: %5s\n", sqlca.sqlstate);
+  fprintf(stderr, "===============\n");
+}

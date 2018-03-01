@@ -1,0 +1,113 @@
+#include <stdlib.h>    
+//#include <sqlca.h>
+#include <string.h>    
+//EXEC SQL INCLUDE sqlca;    
+    
+int main() {  
+//    void print_sqlca();
+
+    EXEC SQL BEGIN DECLARE SECTION;
+         int caID[3];
+         char caName[3][30+1];
+    EXEC SQL END DECLARE SECTION;
+	
+    EXEC SQL CONNECT TO "lwwtest@10.136.2.133:5432" USER "lww" IDENTIFIED BY "lww";
+    if(sqlca.sqlcode)
+    {
+      printf("Connect DB error! sqlcode=%d!\n", sqlca.sqlcode);
+    }
+	//EXEC SQL BEGIN TRANSACTIONS;
+       
+       caID[0]=1;
+       strcpy(caName[0], "varchar123");
+       caID[1]=2;
+       strcpy(caName[1],"一二三四五六七八九十");
+       caID[2]=3;
+       strcpy(caName[2], "0123456789");
+EXEC SQL INSERT INTO organ values(:caID[0], :caName[0]);
+EXEC SQL INSERT INTO organ values(:caID[1], :caName[1]);
+EXEC SQL INSERT INTO organ values(:caID[2], :caName[2]);
+
+/*if(sqlca.sqlcode)
+           {
+             print_sqlca();
+           
+}
+EXEC SQL COMMIT;
+*/
+/*	EXEC SQL INSERT INTO test_ecpg_tbl values(1, 'varchar123');
+        if(sqlca.sqlcode)
+           {
+             print_sqlca();
+           }
+        EXEC SQL COMMIT;
+        EXEC SQL INSERT INTO test_ecpg_tbl values(2, '一二三四五六七八九十');
+          if(sqlca.sqlcode)
+           {
+             print_sqlca();
+           }
+	EXEC SQL COMMIT;
+        EXEC SQL INSERT INTO test_ecpg_tbl values(3, '0123456789');
+        if(sqlca.sqlcode)
+           {
+             print_sqlca();
+           }
+        EXEC SQL COMMIT;
+*/
+
+        EXEC SQL UPDATE organ SET organcode=100 WHERE organcode=1;
+        EXEC SQL COMMIT;
+//      EXEC SQL delete from organ where organcode=100;
+  //    EXEC SQL COMMIT;
+	
+     EXEC SQL BEGIN TRANSACTION; 
+	EXEC SQL DECLARE tb_cur CURSOR FOR
+	     select organcode, organname INTO :caID, :caName from organ;
+	//if(sqlca.sqlcode){}
+	EXEC SQL OPEN tb_cur;
+	//if(sqlca.sqlcode){}
+        //EXEC SQL WHENEVER NOT FOUND DO BREAK;
+        while(1)
+        {
+         memset( caName, 0x00, sizeof( caName));
+	 EXEC SQL FETCH 2 tb_cur INTO :caID, :caName;
+         printf("%d\n", sqlca.sqlerrd[2]);
+         if(sqlca.sqlcode==100)
+          {
+           //print_sqlca();
+           break;
+          }
+         int i=0;
+        for( i=0 ; i<sqlca.sqlerrd[2]; i++)
+         printf("id=%d, name=%s\n", caID[i], caName[i]); //char name
+        // printf("id=%d, name=%*s\n", caID[i], caName[i].len, caName[i].arr);//varchar name
+         //if(sqlca.sqlcode==100) break;
+        }
+
+	EXEC SQL CLOSE tb_cur;
+     EXEC SQL COMMIT;
+
+      //EXEC SQL delete from test_ecpg_tbl where id=100;
+      //EXEC SQL COMMIT;
+
+      //EXEC SQL WHENEVER SQLERROR CALL print_sqlca();
+	
+     EXEC SQL DISCONNECT all;
+    
+     return 0;
+}
+
+void print_sqlca()
+{
+fprintf(stderr, "==== sqlca ====\n");
+fprintf(stderr, "sqlcode: %ld\n", sqlca.sqlcode);
+fprintf(stderr, "sqlerrm.sqlerrml: %d\n", sqlca.sqlerrm.sqlerrml);
+fprintf(stderr, "sqlerrm.sqlerrmc: %s\n", sqlca.sqlerrm.sqlerrmc);
+fprintf(stderr, "sqlerrd: %ld %ld %ld %ld %ld %ld\n", sqlca.sqlerrd[0],sqlca.sqlerrd[1],sqlca.sqlerrd[2],
+sqlca.sqlerrd[3],sqlca.sqlerrd[4],sqlca.sqlerrd[5]);
+fprintf(stderr, "sqlwarn: %d %d %d %d %d %d %d %d\n", sqlca.sqlwarn[0], sqlca.sqlwarn[1], sqlca.sqlwarn[2],
+sqlca.sqlwarn[3], sqlca.sqlwarn[4], sqlca.sqlwarn[5],
+sqlca.sqlwarn[6], sqlca.sqlwarn[7]);
+fprintf(stderr, "sqlstate: %5s\n", sqlca.sqlstate);
+fprintf(stderr, "===============\n");
+}  

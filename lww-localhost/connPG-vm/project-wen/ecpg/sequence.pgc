@@ -1,0 +1,59 @@
+#include <stdlib.h>
+
+int main()
+{
+  EXEC SQL WHENEVER sqlerror sqlprint;
+  EXEC SQL CONNECT TO test@10.136.1.143:5432 USER lww/lww;
+  /*
+  if(sqlca.sqlcode)
+    printf("Connect database ERROR! sqlca.sqlcode=%s!\n", sqlca.sqlcode);
+  else
+    printf("Connect database OK!\n");
+  */
+  EXEC SQL BEGIN DECLARE SECTION;
+    long lastVal;
+    long session_lastVal;
+    long nextVal[5];
+    long currVal;
+    long setVal;
+    int i;
+  EXEC SQL END DECLARE SECTION;
+
+  //EXEC SQL DROP SEQUENCE myseq;
+  /*//first test
+    EXEC SQL CREATE SEQUENCE myseq 
+           MINVALUE 1
+           MAXVALUE 999999
+           START WITH 1
+           INCREMENT BY 1
+           CACHE 5 
+           CYCLE;
+  EXEC SQL COMMIT; 
+  */
+  for(i=0; i<3; i++)
+  {  
+    EXEC SQL select nextval('myseq') INTO :nextVal[i];
+    printf("The sequence next_value: nextval%d = %d\n", i, nextVal[i]);
+   }
+  EXEC SQL select currval('myseq') INTO :currVal;
+  EXEC SQL SELECT last_value INTO :lastVal FROM myseq;
+  printf("The sequence current_value of my session: currval = %d\n", currVal);
+  printf("The sequence last_value of my session: lastval = %d\n", lastVal);
+
+  EXEC SQL select setval('myseq', 1) INTO :setVal;
+  printf("setval()--manual set the sequence's value：setVal = %d\n", setVal);
+
+  EXEC SQL DISCONNECT ALL;
+
+  EXEC SQL WHENEVER sqlerror sqlprint;
+  EXEC SQL CONNECT TO test@10.136.1.143:5432 USER lww/lww;
+  EXEC SQL select nextval('myseq') INTO :nextVal[0];
+  EXEC SQL SELECT lastval() INTO :session_lastVal;
+  EXEC SQL SELECT last_value INTO :lastVal FROM myseq;
+  printf("after reconnect db get nextval(): nextval = %d\n", nextVal[0]);
+  printf("lastval()--the last value in current session had been used: session_lastval = %d\n", session_lastVal);
+  printf("after reconnect db get last_value (about cache): lastval = %d\n", lastVal);
+ 
+  EXEC SQL DISCONNECT ALL;
+  return 0;  
+ }

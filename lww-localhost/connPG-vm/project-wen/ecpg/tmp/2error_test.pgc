@@ -1,0 +1,85 @@
+#include <stdlib.h>    
+//#include <sqlca.h>
+    
+//EXEC SQL INCLUDE sqlca;    
+    
+int main() {  
+    EXEC SQL BEGIN DECLARE SECTION;
+         int caID;
+         varchar caName[30];
+         char caName1[30];
+    EXEC SQL END DECLARE SECTION;
+	
+    //EXEC SQL CONNECT TO "lwwtest@10.136.2.133:5432" USER "lww" IDENTIFIED BY "lww";
+    EXEC SQL CONNECT TO "test@10.50.6.83:5432" USER "lww" IDENTIFIED BY "lww";
+    if(sqlca.sqlcode)
+    {
+      printf("Connect DB error! sqlcode=%d!\n", sqlca.sqlcode);
+    }
+	//EXEC SQL BEGIN TRANSACTION;
+	EXEC SQL INSERT INTO organ values(5, 'testfenku');
+        if(sqlca.sqlcode)
+    {
+      printf("insert error! sqlcode=%d!\n", sqlca.sqlcode);
+    }
+
+//        EXEC SQL COMMIT;
+
+        EXEC SQL INSERT INTO organ values(6, '中文测试一二三四五六');
+ if(sqlca.sqlcode)
+    {
+      printf("insert error! sqlcode=%d!\n", sqlca.sqlcode);
+    }
+  //      EXEC SQL COMMIT;
+/*
+        EXEC SQL UPDATE organ SET organcode=100 WHERE organcode=5;
+if(sqlca.sqlcode)
+    {
+      printf("update error! sqlcode=%d!\n", sqlca.sqlcode);
+    }
+
+    //    EXEC SQL COMMIT;
+      EXEC SQL delete from organ where organcode=1;
+if(sqlca.sqlcode)
+    {
+      printf("delete error! sqlcode=%d!\n", sqlca.sqlcode);
+    }
+*/
+  //    EXEC SQL COMMIT;
+	//exit (1);
+        EXEC SQL BEGIN TRANSACTION;
+	EXEC SQL DECLARE tb_cur CURSOR FOR
+	     select organcode, organname INTO :caID, :caName from organ;
+	//if(sqlca.sqlcode){}
+	EXEC SQL OPEN tb_cur;
+	//if(sqlca.sqlcode){}
+        EXEC SQL WHENEVER NOT FOUND DO BREAK;
+
+//testing--        printf("immmm\n"); 
+//exit(1);
+       while(1)
+        {
+//memset(caName, 0x00, sizeof(caName1));
+      //    EXEC SQL FETCH tb_cur INTO :caID, :caName1;
+      //    printf("id=%d, name=%s\n", caID, caName1); //char name
+          EXEC SQL FETCH tb_cur INTO :caID, :caName;
+          printf("id=%d, name=%*s\n", caID,caName.len, caName.arr);//varchar name
+//testing--   break;//just one result!
+//          sleep (5);
+          if(sqlca.sqlcode)
+           {
+              printf("select error! sqlcode=%d!\n", sqlca.sqlcode);
+              break;
+            }
+         }
+
+	EXEC SQL CLOSE tb_cur;
+	EXEC SQL COMMIT;
+
+  //    EXEC SQL delete from test_ecpg_tbl where id=100;
+  //    EXEC SQL COMMIT;
+	
+        EXEC SQL DISCONNECT all;
+    
+        return 0;    
+}
